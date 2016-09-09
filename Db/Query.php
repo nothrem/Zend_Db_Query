@@ -1149,6 +1149,22 @@ abstract class Zend_Db_Query
     }
 
     /**
+     * Returns all WHERE conditions to be used as a sub-condition
+     *
+     * @return string
+     * @example <code>
+     *    $cond = new Zend_Db_Query_Mysql();
+     *    $cond
+     *    	->where($query->column('id', null, 1))
+     *    	->orwhere($query->column('id', null, 5))
+     *    $query->where($cond->getWhere());
+     * </code>
+     */
+    public function getWhere() {
+    	return implode(' ', $this->_parts[self::WHERE]);
+    }
+
+    /**
      * Render GROUP clause
      *
      * @param string   $sql SQL query
