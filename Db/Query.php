@@ -1149,22 +1149,6 @@ abstract class Zend_Db_Query
     }
 
     /**
-     * Returns all WHERE conditions to be used as a sub-condition
-     *
-     * @return string
-     * @example <code>
-     *    $cond = new Zend_Db_Query_Mysql();
-     *    $cond
-     *    	->where($query->column('id', null, 1))
-     *    	->orwhere($query->column('id', null, 5))
-     *    $query->where($cond->getWhere());
-     * </code>
-     */
-    public function getWhere() {
-    	return implode(' ', $this->_parts[self::WHERE]);
-    }
-
-    /**
      * Render GROUP clause
      *
      * @param string   $sql SQL query
@@ -1322,6 +1306,9 @@ abstract class Zend_Db_Query
     public function __toString()
     {
         try {
+        	if ($this->_isCondition) {
+        		return implode(' ', $this->_parts[self::WHERE]);
+        	}
             $sql = $this->assemble();
         } catch (Exception $e) {
             trigger_error($e->getMessage(), E_USER_WARNING);
@@ -1676,4 +1663,29 @@ abstract class Zend_Db_Query
     			return new Zend_Db_Expr($this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value);
     	}
     }
+
+    /**
+     * @var boolean Marks that this Query is a subcondition and should return only WHERE part when converted to string
+     */
+    protected $_isCondition = false;
+
+    /**
+     * Returns all WHERE conditions to be used as a sub-condition
+     *
+     * @return string
+     * @example <code>
+     *    $cond = new Zend_Db_Query_Mysql();
+     *    $cond
+     *    	->where($query->column('id', null, 1))
+     *    	->orwhere($query->column('id', null, 5))
+     *    $query->where($cond->getWhere());
+     * </code>
+     */
+    public function condition() {
+    	$self = get_class($this);
+    	$condition = new $self();
+    	$condition->_isCondition = true;
+    	return $condition;
+    }
+
 }

@@ -20,7 +20,7 @@ Usage
 	
 See [Zend Manual](https://framework.zend.com/manual/1.10/en/zend.db.select.html) for more details.
 	
-Using method ```column()```
+Method ```column()```
 ---------------------------
 
 Method ```column()``` is new and not present in the original ```Zend_Db_Select```.
@@ -52,17 +52,53 @@ It can translate table and column names to their aliases.
 	 *   ORDER BY `a`.`release_time` DESC
 	 */
 
-Note that currently there is a problem inside the join condition, because it
-cannot correctly translate the columns from the table currently being joined
-(because you call the ```column()``` method before the ```join*()``` method
-actually adds the table and its columns).
+Method ```column()``` returns ```Zend_Db_Expr``` which means its return value
+can be safely used in any other ```Zend_Db_Query``` or ```Zend_Db_Select``` method.
 
-As a workaround you must define these columns as a ```string``` or ```Zend_Db_Expr```.
+When using the ```column()``` method inside the ```order()``` method,
+you can set the value to null and then use 'asc' or 'desc' as the operator.
+Alternatively, you can use ```Zend_Db_Query::SQL_ASC``` or ```Zend_Db_Query::SQL_DESC```.
 
-Other methods (e.g. ```group()``` or ```order()```) may not fully support
-the ```column()``` method result and may mess up the quoting.
-This is a bug in the Zend library.
-As a workaround you must define these columns as ```Zend_Db_Expr```.
+Note that inside the ```join*()``` methods the method ```column()``` cannot
+correctly translate the columns and table aliases for the table currently
+being joined, because you call the ```column()``` method before the ```join*()```
+method actually adds the table and its columns).
+
+Method ```condition()```
+---------------------------
+
+Method ```condition()``` is new and not present in the original ```Zend_Db_Select```.
+
+It can be used to create sub-conditions where needed.
+
+	require_once 'Zend/Db/Query/Mysql.php';
+	
+	$query = new Zend_Db_Query_Mysql();
+	
+	$query
+		->from(array('a' => 'articles'))
+		->columns(array('id', 'text' => 'content_text'))
+		->where($query->column('published', null, 1))
+		->where($query->condition()
+			->where($query->column('available', null, 'free'))
+			->orWhere($query->column('available', null, 'preview'))
+		)
+	;
+	
+	$sql = $query->assemble();
+	
+	/* returns
+	 *   SELECT `a`.`id`, `a`.`content_text` AS `text` 
+	 *   FROM `articles` AS `a` 
+	 *   WHERE 
+	 *     (`a`.`published` = 1) 
+	 *     AND
+	 *     (
+	 *       (`a`.`available` = 'free')
+	 *       OR
+	 *       (`a`.`available` = 'preview')
+	 *     )
+	 */
 
 Standalone usage
 -----------------
