@@ -1631,8 +1631,12 @@ abstract class Zend_Db_Query
     		}
     	}
 
+    	$operator = strtoupper($operator);
     	if (isset($value)) {
-    		$value = ' ' . strtoupper($operator) . ' ' . $this->quote($value);
+    		$value = ' ' . $operator . ' ' . $this->quote($value);
+    	}
+    	elseif (in_array($operator, array(self::SQL_ASC, self::SQL_DESC))) {
+    		$value = ' ' . $operator;
     	}
     	else {
     		$value = '';
@@ -1640,22 +1644,23 @@ abstract class Zend_Db_Query
 
     	switch (count($match)) {
     		case 1: //only one column found, return it with table alias stored in its data
-    			return $this->quoteIdentifier($match[0][0]) . '.' . ($this->quoteIdentifier($match[0][2] ? $match[0][2] : $match[0][1])) . $value;
+    			$name = ($match[0][2] ? $match[0][2] : $match[0][1]);
+    			//NO BREAK HERE
     		case 0: //no column found, but if table is defined, we can still use it
     			if (is_null($tableName)) {
     				if (1 === count($this->getPart(self::FROM))) {
     					$tables = $this->getPart(self::FROM);
     					reset($tables);
-    					return $this->quoteIdentifier(key($tables)) . '.' . ($this->quoteIdentifier($name)) . $value;
+    					return new Zend_Db_Expr($this->quoteIdentifier(key($tables)) . '.' . ($this->quoteIdentifier($name)) . $value);
     				}
     				throw new Zend_Db_Select_Exception("Column '$name' not found in column list. Please specify table name.");
     			}
     			foreach ($this->getPart(self::FROM) as $alias => $table) {
     				if ($tableName === $alias || $tableName === $table['tableName']) {
-    					return $this->quoteIdentifier($alias) . '.' . ($this->quoteIdentifier($name)) . $value;
+    					return new Zend_Db_Expr($this->quoteIdentifier($alias) . '.' . ($this->quoteIdentifier($name)) . $value);
     				}
     			}
-    			return $this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value;
+    			return new Zend_Db_Expr($this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value);
 
     		default: //more columns found, must check from which table the column is
     			if (is_null($tableName)) {
@@ -1665,10 +1670,10 @@ abstract class Zend_Db_Query
     				$col = null;
     				if ($tableName === $alias || $tableName === $table['tableName']) {
     					$col = $index[$alias];
-    					return $this->quoteIdentifier($col[0]) . '.' . ($this->quoteIdentifier($col[2] ? $col[2] : $col[1])) . $value;
+    					return new Zend_Db_Expr($this->quoteIdentifier($col[0]) . '.' . ($this->quoteIdentifier($col[2] ? $col[2] : $col[1])) . $value);
     				}
     			}
-    			return $this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value;
+    			return new Zend_Db_Expr($this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value);
     	}
     }
 }

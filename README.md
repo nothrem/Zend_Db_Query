@@ -35,10 +35,10 @@ It can translate table and column names to their aliases.
 		->from(array('a' => 'articles'))
 		->columns(array('id', 'text' => 'content_text'))
 		->joinLeft('authors',
-			$query->column('author', 'articles', new Zend_Db_Expr('authors.id'))
+			$query->column('author', 'articles', $query->column('id', 'authors'))
 		)
 		->where($query->column('archived', 'articles', 0))
-		->order(new Zend_Db_Expr($query->column('release_time', 'articles') . ' DESC'))
+		->order($query->column('release_time', 'articles', null, 'desc'))
 	;
 	
 	$sql = $query->assemble();
@@ -47,7 +47,7 @@ It can translate table and column names to their aliases.
 	 *   SELECT `a`.`id`, `a`.`content_text` AS `text` 
 	 *   FROM `articles` AS `a` 
 	 *   LEFT JOIN `authors` 
-	 *     ON `a`.`author` = authors.id 
+	 *     ON `a`.`author` = `authors`.`id`
 	 *   WHERE (`a`.`archived` = 0) 
 	 *   ORDER BY `a`.`release_time` DESC
 	 */
