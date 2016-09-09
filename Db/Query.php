@@ -87,13 +87,6 @@ abstract class Zend_Db_Query
     protected $_bind = array();
 
     /**
-     * Zend_Db_Adapter_Abstract object.
-     *
-     * @var Zend_Db_Adapter_Abstract
-     */
-    protected $_adapter;
-
-    /**
      * The initial values for the $_parts array.
      * NOTE: It is important for the 'FOR_UPDATE' part to be last to ensure
      * meximum compatibility with database adapters.
@@ -1379,8 +1372,6 @@ abstract class Zend_Db_Query
      */
     public function quote($value, $type = null)
     {
-    	$this->_connect();
-
     	if ($value instanceof Zend_Db_Select || $value instanceof Zend_Db_Query) {
     		return '(' . $value->assemble() . ')';
     	}
