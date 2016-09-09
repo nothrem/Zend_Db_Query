@@ -73,22 +73,6 @@ class Zend_Db_Query_Mysql extends Zend_Db_Query
 	);
 
     /**
-     * Quote a raw string.
-     *
-     * @param mixed $value Raw string
-     *
-     * @return string           Quoted string
-     */
-    protected function _quote($value)
-    {
-    	if (is_int($value) || is_float($value)) {
-    		return $value;
-    	}
-    	$this->_connect();
-    	return "'" . mysqli::real_escape_string($value) . "'";
-    }
-
-    /**
      * Returns the symbol the adapter uses for delimiting identifiers.
      *
      * @return string
