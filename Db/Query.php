@@ -1569,4 +1569,84 @@ abstract class Zend_Db_Query
 
     protected abstract function _renderLimit($sql, $count, $offset = 0);
 
+    /* Added code (c) 2016 Nothrem Sinsky */
+
+    /**
+     * Look for a column in the column list and return its quoted name
+     * or condition with its name.
+     *
+     * Works on both Full name (e.g. 'users.index') and alias (e.g. 'u.i'),
+     * always returns aliased names as defined in from(), columns() or join*().
+     *
+     * @param  string $name Full name or alias of a column.
+     * @param  string $tableName (optional, default: null) Full name or alias of a table the column belong to. Must be defined if $name is not defined in column list or the $name is ambiguous.
+     * @param  mixed $value (optional, default: null) If defined, will return full condition with the $operator and quoted $value.
+     * @param  string $operator (optional, default: '=') Operator for the condition.
+     * @throws Zend_Db_Select_Exception
+     * @return string Table and column alias (or full name if not defined) or whole condition incl. the given $value.
+     *
+     * @example <code>
+     *     $query->from(array('u' => 'users'), array('i' => 'id', 'name' => 'FullName'));
+     *
+     *     $query->column('id');                            //returns "`u`.`i`"
+     *     $query->column('id', 'user');                    //returns "`u`.`i`"
+     *     $query->column('gender');                        //throws exception because column `gender` was not defined in from()
+     *     $query->column('gender', 'user_data');           //returns "`user_data`.`gender`" because it knows both column and table name
+     *
+     *     $query->column('id', 'users', 123);              //returns "`u`.`i` = 123"
+     *     $query->column('name', null, '%Doe', 'like');    //returns "`u`.`name` LIKE 'John Doe'"
+     *     $query->column('gender', 'users', 'male', '!='); //returns "`u`.`gender` != 'male'"
+     *
+     *     $query->where($query->column('id', null, 123));  //adds condition with correctly aliased, prefixed and quoted name and value: " (`u`.`i` = 123) "
+     */
+    public function column($name, $tableName = null, $value = null, $operator = '=') {
+    	if (!is_string($name)) {
+    		throw new Zend_Db_Select_Exception('Invalid column name. String expected, ' . gettype($name) . ' given.');
+    	}
+
+    	$match = array();
+    	$index = array();
+
+    	foreach ($this->getPart(self::COLUMNS) as $col) {
+    		if ($col[1] === $name || $col[2] === $name) {
+    			$match[] = $col;
+    			$index[$col[0]] = $col;
+    		}
+    	}
+
+    	if (isset($value)) {
+    		$value = ' ' . strtoupper($operator) . ' ' . $this->quote($value);
+    	}
+    	else {
+    		$value = '';
+    	}
+
+    	switch (count($match)) {
+    		case 1: //only one column found, return it with table alias stored in its data
+    			return $this->quoteIdentifier($match[0][0]) . '.' . ($this->quoteIdentifier($match[0][2] ? $match[0][2] : $match[0][1])) . $value;
+    		case 0: //no column found, but if table is defined, we can still use it
+    			if (is_null($tableName)) {
+    				throw new Zend_Db_Select_Exception("Column '$name' not found in column list. Please specify table name.");
+    			}
+    			foreach ($this->getPart(self::FROM) as $alias => $table) {
+    				if ($tableName === $alias || $tableName === $table['tableName']) {
+    					return $this->quoteIdentifier($alias) . '.' . ($this->quoteIdentifier($name)) . $value;
+    				}
+    			}
+    			return $this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value;
+
+    		default: //more columns found, must check from which table the column is
+    			if (is_null($tableName)) {
+    				throw new Zend_Db_Select_Exception("Ambiguous column '$name'. Please specify table name.");
+    			}
+    			foreach ($this->getPart(self::FROM) as $alias => $table) {
+    				$col = null;
+    				if ($tableName === $alias || $tableName === $table['tableName']) {
+    					$col = $index[$alias];
+    					return $this->quoteIdentifier($col[0]) . '.' . ($this->quoteIdentifier($col[2] ? $col[2] : $col[1])) . $value;
+    				}
+    			}
+    			return $this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value;
+    	}
+    }
 }
