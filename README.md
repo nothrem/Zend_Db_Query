@@ -113,23 +113,23 @@ In the array, you can pass 2, 3 or 4 values which then will be translated
 to columns and tables as follows:
 
 	$query
-		->from('articles')
-		->columns('text', 'category')
+		->from(array('a' => 'articles'))
+		->columns(array('text', 'cat' => 'category'))
 		
 		//with 2 values, first one is from joined table,
 		//the other one is searched in columns list
-		->joinInner('categories', array('id', 'category'))
-		// creates "ON `categories`.`id` = `articles`.`category`"
+		->joinInner(array('c' => 'categories'), array('id', 'category'))
+		// creates "ON `c`.`id` = `a`.`cat`"
 		
 		//with 3 values, first one is from joined table,
 		//the other one is processed as table name and column name
-		->joinLeft('authors'), array('id', 'articles', 'author')
-		//creates "ON `authors`.`id` = `articles`.`author`"
+		->joinLeft(array('au' => 'authors'), array('id', 'articles', 'author'))
+		//creates "ON `au`.`id` = `a`.`author`"
 		
 		//4 values are processed as 2 combinations of table and column names
 		//e.g. array('table1', 'column1', 'table2', 'column2');
 		->joinLeft('comments'), array('comments', 'article', 'articles', 'id')
-		//creates "`comments`.`article` = `articles`.`id`"
+		//creates "ON `comments`.`article` = `a`.`id`"
 	;
 	
 	 LEFT JOIN `authors`  LEFT JOIN `comments` ON 
