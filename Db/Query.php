@@ -1093,7 +1093,7 @@ abstract class Zend_Db_Query
 
             // Add join conditions (if applicable)
             if (!empty($from) && ! empty($table['joinCondition'])) {
-                $tmp .= ' ' . self::SQL_ON . ' ' . $table['joinCondition'];
+                $tmp .= ' ' . self::SQL_ON . ' ' . $this->_renderJoinCondition($table['joinCondition'], $correlationName);
             }
 
             // Add the table name and condition add to the list
@@ -1106,6 +1106,32 @@ abstract class Zend_Db_Query
         }
 
         return $sql;
+    }
+
+    /**
+     * Convert JOIN condition saved as array into string using column() method
+     *
+     * @param array|string|Zend_Db_Expr $condition
+     * @param string $correlationName
+     * @throws Zend_Db_Select_Exception
+     * @return string
+     */
+    protected function _renderJoinCondition($condition, $correlationName) {
+    	if (!is_array($condition)) {
+    		return $condition;
+    	}
+
+		switch (count($condition)) {
+			case 0:
+			case 1:
+				throw new Zend_Db_Select_Exception('JOIN condition requires two columns.');
+			case 2:
+				return $this->column($condition[0], $correlationName) . ' = ' . $this->column($condition[1]);
+			case 3:
+				return $this->column($condition[0], $correlationName) . ' = ' . $this->column($condition[2], $condition[1]);
+			case 4:
+				return $this->column($condition[1], $condition[0]) . ' = ' . $this->column($condition[3], $condition[2]);
+		}
     }
 
     /**
@@ -1622,7 +1648,7 @@ abstract class Zend_Db_Query
     	if (isset($value)) {
     		$value = ' ' . $operator . ' ' . $this->quote($value);
     	}
-    	elseif (in_array($operator, array(self::SQL_ASC, self::SQL_DESC))) {
+    	elseif (in_array($operator, array(self::SQL_ASC, self::SQL_DESC, 'IS NULL', 'IS NOT NULL'))) {
     		$value = ' ' . $operator;
     	}
     	else {
@@ -1632,6 +1658,7 @@ abstract class Zend_Db_Query
     	switch (count($match)) {
     		case 1: //only one column found, return it with table alias stored in its data
     			$name = ($match[0][2] ? $match[0][2] : $match[0][1]);
+    			$tableName = $match[0][0];
     			//NO BREAK HERE
     		case 0: //no column found, but if table is defined, we can still use it
     			if (is_null($tableName)) {

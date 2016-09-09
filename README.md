@@ -99,6 +99,40 @@ It can be used to create sub-conditions where needed.
 	 *       (`a`.`available` = 'preview')
 	 *     )
 	 */
+	 
+JOIN condition as array
+-----------------------
+
+This is new and not present in the original ```Zend_Db_Select```.
+
+When creating a join, instead of passing the condition as string, you can
+use array and it will automatically convert the column and table names
+to their aliases.
+
+In the array, you can pass 2, 3 or 4 values which then will be translated
+to columns and tables as follows:
+
+	$query
+		->from('articles')
+		->columns('text', 'category')
+		
+		//with 2 values, first one is from joined table,
+		//the other one is searched in columns list
+		->joinInner('categories', array('id', 'category'))
+		// creates "ON `categories`.`id` = `articles`.`category`"
+		
+		//with 3 values, first one is from joined table,
+		//the other one is processed as table name and column name
+		->joinLeft('authors'), array('id', 'articles', 'author')
+		//creates "ON `authors`.`id` = `articles`.`author`"
+		
+		//4 values are processed as 2 combinations of table and column names
+		//e.g. array('table1', 'column1', 'table2', 'column2');
+		->joinLeft('comments'), array('comments', 'article', 'articles', 'id')
+		//creates "`comments`.`article` = `articles`.`id`"
+	;
+	
+	 LEFT JOIN `authors`  LEFT JOIN `comments` ON 
 
 Standalone usage
 -----------------
