@@ -1598,6 +1598,7 @@ abstract class Zend_Db_Query
      *     $query->column('gender', 'users', 'male', '!='); //returns "`u`.`gender` != 'male'"
      *
      *     $query->where($query->column('id', null, 123));  //adds condition with correctly aliased, prefixed and quoted name and value: " (`u`.`i` = 123) "
+     * </code>
      */
     public function column($name, $tableName = null, $value = null, $operator = '=') {
     	if (!is_string($name)) {
@@ -1626,6 +1627,11 @@ abstract class Zend_Db_Query
     			return $this->quoteIdentifier($match[0][0]) . '.' . ($this->quoteIdentifier($match[0][2] ? $match[0][2] : $match[0][1])) . $value;
     		case 0: //no column found, but if table is defined, we can still use it
     			if (is_null($tableName)) {
+    				if (1 === count($this->getPart(self::FROM))) {
+    					$tables = $this->getPart(self::FROM);
+    					reset($tables);
+    					return $this->quoteIdentifier(key($tables)) . '.' . ($this->quoteIdentifier($name)) . $value;
+    				}
     				throw new Zend_Db_Select_Exception("Column '$name' not found in column list. Please specify table name.");
     			}
     			foreach ($this->getPart(self::FROM) as $alias => $table) {
