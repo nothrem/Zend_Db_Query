@@ -1657,7 +1657,10 @@ abstract class Zend_Db_Query
 
     	switch (count($match)) {
     		case 1: //only one column found, return it with table alias stored in its data
-    			$name = ($match[0][2] ? $match[0][2] : $match[0][1]);
+    			if (!empty($match[0][2])) {
+    				return new Zend_Db_Expr($this->quoteIdentifier($match[0][2]) . $value);
+    			}
+    			$name = $match[0][1];
     			$tableName = $match[0][0];
     			//NO BREAK HERE
     		case 0: //no column found, but if table is defined, we can still use it
@@ -1684,7 +1687,7 @@ abstract class Zend_Db_Query
     				$col = null;
     				if ($tableName === $alias || $tableName === $table['tableName']) {
     					$col = $index[$alias];
-    					return new Zend_Db_Expr($this->quoteIdentifier($col[0]) . '.' . ($this->quoteIdentifier($col[2] ? $col[2] : $col[1])) . $value);
+    					return new Zend_Db_Expr($col[2] ? $this->quoteIdentifier($col[2]) : ($this->quoteIdentifier($col[0]) . '.' . $this->quoteIdentifier($col[1])) . $value);
     				}
     			}
     			return new Zend_Db_Expr($this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value);
