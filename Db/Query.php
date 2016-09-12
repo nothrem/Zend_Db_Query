@@ -1057,7 +1057,7 @@ abstract class Zend_Db_Query
             }
         }
 
-        return $sql . ' ' . implode(', ', $columns);
+        return $sql . "\n\t" . implode(",\n\t", $columns);
     }
 
     /**
@@ -1102,7 +1102,7 @@ abstract class Zend_Db_Query
 
         // Add the list of all joins
         if (!empty($from)) {
-            $sql .= ' ' . self::SQL_FROM . ' ' . implode("\n", $from);
+            $sql .= "\n " . self::SQL_FROM . ' ' . implode("\n", $from);
         }
 
         return $sql;
@@ -1168,7 +1168,7 @@ abstract class Zend_Db_Query
     protected function _renderWhere($sql)
     {
         if ($this->_parts[self::FROM] && $this->_parts[self::WHERE]) {
-            $sql .= ' ' . self::SQL_WHERE . ' ' .  implode(' ', $this->_parts[self::WHERE]);
+            $sql .= "\n " . self::SQL_WHERE . ' ' .  implode("\n\t", $this->_parts[self::WHERE]);
         }
 
         return $sql;
@@ -1187,7 +1187,7 @@ abstract class Zend_Db_Query
             foreach ($this->_parts[self::GROUP] as $term) {
                 $group[] = $this->quoteIdentifier($term, true);
             }
-            $sql .= ' ' . self::SQL_GROUP_BY . ' ' . implode(",\n\t", $group);
+            $sql .= "\n " . self::SQL_GROUP_BY . ' ' . implode(",\n\t", $group);
         }
 
         return $sql;
@@ -1202,7 +1202,7 @@ abstract class Zend_Db_Query
     protected function _renderHaving($sql)
     {
         if ($this->_parts[self::FROM] && $this->_parts[self::HAVING]) {
-            $sql .= ' ' . self::SQL_HAVING . ' ' . implode(' ', $this->_parts[self::HAVING]);
+            $sql .= "\n " . self::SQL_HAVING . ' ' . implode(' ', $this->_parts[self::HAVING]);
         }
 
         return $sql;
@@ -1231,7 +1231,7 @@ abstract class Zend_Db_Query
                     $order[] = $this->quoteIdentifier($term, true);
                 }
             }
-            $sql .= ' ' . self::SQL_ORDER_BY . ' ' . implode(', ', $order);
+            $sql .= "\n " . self::SQL_ORDER_BY . ' ' . implode(', ', $order);
         }
 
         return $sql;
