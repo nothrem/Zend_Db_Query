@@ -1718,4 +1718,61 @@ abstract class Zend_Db_Query
     	return $condition;
     }
 
+    /**
+     * @var $_states Store custom states
+     */
+    protected $_states = array();
+
+    /**
+     * Add custom state with optional value
+     *
+     * @param string $name
+     * @param mixed $value (optional, default: true) Any value, use NULL to delete state
+     * @return Zend_Db_Query
+     */
+    public function setState($name, $value = true) {
+    	if (is_null($value)) {
+    		unset($this->_states[$name]);
+    	}
+    	else {
+    		$this->_states[$name] = $value;
+    	}
+
+    	return $this;
+    }
+
+    /**
+     * Check if the query as given custom state
+     *
+     * @param  string $name
+     * @return boolean TRUE when state has value other than NULL
+     */
+    public function hasState($name) {
+    	return array_key_exists($name, $this->_states);
+    }
+
+    /**
+     * Return TRUE if given name was not yet set, then add the state
+     *
+     * @param  string $name
+     * @return boolean TRUE when state was not yet set, FALSE if state was already set using setState() or uniqueState()
+     */
+    public function uniqueState($name) {
+    	if ($this->hasState($name)) {
+    		return false;
+    	}
+    	$this->setState($name);
+    	return true;
+    }
+
+    /**
+     * Return value of a state
+     *
+     * @param  string $name
+     * @return NULL|Mixed
+     */
+    public function getState($name) {
+    	return $this->hasState($name) ? $this->_states[$name] : null;
+    }
+
 }
