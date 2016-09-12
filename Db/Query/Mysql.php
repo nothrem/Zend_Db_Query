@@ -111,7 +111,7 @@ class Zend_Db_Query_Mysql extends Zend_Db_Query
     		throw new Zend_Db_Adapter_Mysqli_Exception("LIMIT argument offset=$offset is not valid");
     	}
 
-    	$sql .= " LIMIT $count";
+    	$sql .= "\n LIMIT $count";
     	if ($offset > 0) {
     		$sql .= " OFFSET $offset";
     	}
