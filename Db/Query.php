@@ -1623,8 +1623,11 @@ abstract class Zend_Db_Query
      *     $query->column('gender', 'user_data');           //returns "`user_data`.`gender`" because it knows both column and table name
      *
      *     $query->column('id', 'users', 123);              //returns "`u`.`i` = 123"
-     *     $query->column('name', null, '%Doe', 'like');    //returns "`u`.`name` LIKE 'John Doe'"
      *     $query->column('gender', 'users', 'male', '!='); //returns "`u`.`gender` != 'male'"
+     *     $query->column('name', null, '%Doe', 'like');    //returns "`u`.`name` LIKE '%Doe'"
+     *     $query->column('name', null, 'Doe', 'like');     //returns "`u`.`name` LIKE '%Doe%'" (wraps value in % if $operator is LIKE and there are no % in the $value)
+     *     $query->column('id', null, array(1,2,'-'), 'in');//returns "`u`.`name` IN (1, 2, '-')" (automatically convert and quote array for IN operator)
+     *     $query->column('id', null, $subquery, 'in');     //returns "`u`.`name` IN (SELECT ...)" (accepts another Zend_Db_Query as the value for IN operator)
      *
      *     $query->where($query->column('id', null, 123));  //adds condition with correctly aliased, prefixed and quoted name and value: " (`u`.`i` = 123) "
      * </code>
@@ -1646,7 +1649,23 @@ abstract class Zend_Db_Query
 
     	$operator = strtoupper($operator);
     	if (isset($value)) {
-    		$value = ' ' . $operator . ' ' . $this->quote($value);
+    		if ('LIKE' === $operator && false === strpos($value, '%')) {
+    			$value = ' LIKE ' . $this->quote('%' . $value . '%');
+    		}
+    		elseif ('IN' === $operator) {
+    			if (is_array($value)) {
+    				foreach ($value as $i => $val) {
+    					$value[$i] = $this->quote($val);
+    				}
+    				$value = ' IN (' . implode(', ', $value) . ')';
+    			}
+    			else {
+    				$value = ' IN (' . $value . ')';
+    			}
+    		}
+    		else {
+    			$value = ' ' . $operator . ' ' . $this->quote($value);
+    		}
     	}
     	elseif (in_array($operator, array(self::SQL_ASC, self::SQL_DESC, 'IS NULL', 'IS NOT NULL'))) {
     		$value = ' ' . $operator;
