@@ -1657,7 +1657,10 @@ abstract class Zend_Db_Query
 
     	switch (count($match)) {
     		case 1: //only one column found, return it with table alias stored in its data
-    			$name = ($match[0][2] ? $match[0][2] : $match[0][1]);
+    			if (!empty($match[0][2])) {
+    				return new Zend_Db_Expr($this->quoteIdentifier($match[0][2]) . $value);
+    			}
+    			$name = $match[0][1];
     			$tableName = $match[0][0];
     			//NO BREAK HERE
     		case 0: //no column found, but if table is defined, we can still use it
@@ -1684,7 +1687,7 @@ abstract class Zend_Db_Query
     				$col = null;
     				if ($tableName === $alias || $tableName === $table['tableName']) {
     					$col = $index[$alias];
-    					return new Zend_Db_Expr($this->quoteIdentifier($col[0]) . '.' . ($this->quoteIdentifier($col[2] ? $col[2] : $col[1])) . $value);
+    					return new Zend_Db_Expr($col[2] ? $this->quoteIdentifier($col[2]) : ($this->quoteIdentifier($col[0]) . '.' . $this->quoteIdentifier($col[1])) . $value);
     				}
     			}
     			return new Zend_Db_Expr($this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value);
@@ -1713,6 +1716,63 @@ abstract class Zend_Db_Query
     	$condition = new $self();
     	$condition->_isCondition = true;
     	return $condition;
+    }
+
+    /**
+     * @var $_states Store custom states
+     */
+    protected $_states = array();
+
+    /**
+     * Add custom state with optional value
+     *
+     * @param string $name
+     * @param mixed $value (optional, default: true) Any value, use NULL to delete state
+     * @return Zend_Db_Query
+     */
+    public function setState($name, $value = true) {
+    	if (is_null($value)) {
+    		unset($this->_states[$name]);
+    	}
+    	else {
+    		$this->_states[$name] = $value;
+    	}
+
+    	return $this;
+    }
+
+    /**
+     * Check if the query as given custom state
+     *
+     * @param  string $name
+     * @return boolean TRUE when state has value other than NULL
+     */
+    public function hasState($name) {
+    	return array_key_exists($name, $this->_states);
+    }
+
+    /**
+     * Return TRUE if given name was not yet set, then add the state
+     *
+     * @param  string $name
+     * @return boolean TRUE when state was not yet set, FALSE if state was already set using setState() or uniqueState()
+     */
+    public function uniqueState($name) {
+    	if ($this->hasState($name)) {
+    		return false;
+    	}
+    	$this->setState($name);
+    	return true;
+    }
+
+    /**
+     * Return value of a state
+     *
+     * @param  string $name
+     * @return NULL|Mixed
+     */
+    public function getState($name) {
+    	return $this->hasState($name) ? $this->_states[$name] : null;
     }
 
 }
