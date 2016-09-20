@@ -141,15 +141,15 @@ This is new and not present in the original ```Zend_Db_Select```.
 
 You can use methods ```insert()``` and ```update()``` to create simple
 insert or update queries. Even insert with duplicate key option and update over
-multiple tables as supported. Special cases of these queries (e.g. IGNORE,
+multiple tables are supported. Special cases of these queries (e.g. IGNORE,
 DELAYED, etc.) are not supported (yet).
 
 To switch to INSERT or UPDATE you simple use the methods ```insert()``` or ```update()```
 instead of the method ```from()```. After using the method ```insert()``` you
 can use the method```update()``` to create ON DUPLICATE KEY query. Other combinations
-of the methods ``insert()```, ```update()``` and ```from()``` are not allowed
-and will result in exception. You must use the method ```reset()``` without parameters
-to clear the current state and allow to use the above methods again.
+of the methods ```insert()```, ```update()``` and ```from()``` are not allowed
+and will result in an exception. You must use the method ```reset()``` without any
+parameters to clear the current state and allow to use the above methods again.
 
 To define values for the insert or update you simple pass the column names and
 their values into method ```columns()``` or into above methods as the second parameter.
@@ -161,7 +161,7 @@ name in the ```update()``` method since the parameter is required. Calling
 the method ```update()``` after the ```insert()``` creates separate query which
 must be handled that way (see below).
 
-Insert example:
+INSERT example:
 
     $query
         ->insert('marriage')
@@ -185,7 +185,7 @@ Insert example:
      *     `marriage`.`date` = NOW()
      */
 
-Update example:
+UPDATE example:
 
     $query
         ->update(array('o' => 'online'))
@@ -210,6 +210,10 @@ Update example:
      * ORDER BY `u`.`id`
      * LIMIT 1
      */
+     
+You must define the table names for joins and columns in case you update more table
+since the method ```column()``` cannot detect column names from their definitions
+and the column names would become ambiguous.
 
 Note that you can use other methods for INSERT and UPDATE but their values will
 not be included in the result, e.g.:
@@ -233,15 +237,14 @@ not be included in the result, e.g.:
      *     `marriage`.`date` = NOW()
      */
 
-Example for ON DUPLICATE KEY
+Example for ON DUPLICATE KEY:
 
     $query->insert('marriage');
     $query->columns(array(
                 $query->column('spouse_1', null, 'John'),
                 $query->column('spouse_2', null, 'Jane'),
                 $query->column('date', null, new Zend_Db_Expr('NOW()')),
-        ))
-    ;
+    ));
     $query->update('marriage'); //WRONG
     $query->columns($query->column('date', null, new Zend_Db_Expr('NOW()')));
     $query->assemble();
