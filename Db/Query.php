@@ -53,6 +53,7 @@ abstract class Zend_Db_Query
     const LIMIT_COUNT    = 'limitcount';
     const LIMIT_OFFSET   = 'limitoffset';
     const FOR_UPDATE     = 'forupdate';
+    const DUPLICATE      = 'duplicate';
 
     const INNER_JOIN     = 'inner join';
     const LEFT_JOIN      = 'left join';
@@ -63,9 +64,14 @@ abstract class Zend_Db_Query
 
     const SQL_WILDCARD   = '*';
     const SQL_SELECT     = 'SELECT';
+    const SQL_INSERT     = 'INSERT';
+    const SQL_UPDATE     = 'UPDATE';
+    const SQL_DUPLICATE  = 'ON DUPLICATE KEY';
     const SQL_UNION      = 'UNION';
     const SQL_UNION_ALL  = 'UNION ALL';
     const SQL_FROM       = 'FROM';
+    const SQL_INTO       = 'INTO';
+    const SQL_SET        = 'SET';
     const SQL_WHERE      = 'WHERE';
     const SQL_DISTINCT   = 'DISTINCT';
     const SQL_GROUP_BY   = 'GROUP BY';
@@ -78,6 +84,13 @@ abstract class Zend_Db_Query
     const SQL_ON         = 'ON';
     const SQL_ASC        = 'ASC';
     const SQL_DESC       = 'DESC';
+
+    /**
+     * Define mode of the query (e.g. SELECT, INSERT, etc.)
+     *
+     * @var string
+     */
+    protected $mode = self::SQL_SELECT;
 
     /**
      * Bind variables for query
@@ -104,7 +117,40 @@ abstract class Zend_Db_Query
         self::ORDER        => array(),
         self::LIMIT_COUNT  => null,
         self::LIMIT_OFFSET => null,
-        self::FOR_UPDATE   => false
+        self::FOR_UPDATE   => false,
+        self::DUPLICATE    => array(),
+    );
+
+    /**
+     * List of parts to use when assembling the query
+     *
+     * @var array
+     */
+    protected static $assembleParts = array(
+    		self::SQL_SELECT => array(
+    				self::DISTINCT     => false,
+    				self::COLUMNS      => array(),
+    				self::UNION        => array(),
+    				self::FROM         => array(),
+    				self::WHERE        => array(),
+    				self::GROUP        => array(),
+    				self::HAVING       => array(),
+    				self::ORDER        => array(),
+    				self::LIMIT_OFFSET => null, //actually renders both count and offset
+    				self::FOR_UPDATE   => false
+    		),
+    		self::SQL_INSERT => array(
+    				self::FROM => array(),
+    				self::COLUMNS => array(),
+    				self::DUPLICATE => array(),
+    		),
+    		self::SQL_UPDATE => array(
+    				self::FROM => array(),
+    				self::COLUMNS => array(),
+    				self::WHERE        => array(),
+    				self::ORDER        => array(),
+    				self::LIMIT_OFFSET => null, //actually renders both count and offset
+    		),
     );
 
     /**
@@ -217,7 +263,92 @@ abstract class Zend_Db_Query
      */
     public function from($name, $cols = null, $schema = null)
     {
+    	if ($this->mode !== self::SQL_SELECT) {
+    		throw new Zend_Db_Select_Exception('Cannot select data when using '. $this->mode);
+    	}
         return $this->_join(self::FROM, $name, null, $cols, $schema);
+    }
+
+    /**
+     * Switches the query into INSERT mode and adds an INTO table and optional columns to the query.
+     *
+     * The first parameter $name can be a simple string, in which case the
+     * correlation name is generated automatically.  If you want to specify
+     * the correlation name, the first parameter must be an associative
+     * array in which the key is the correlation name, and the value is
+     * the physical table name.  For example, array('alias' => 'table').
+     * The correlation name is prepended to all columns fetched for this
+     * table.
+     *
+     * The second parameter can be a single string or Zend_Db_Expr object,
+     * or else an array of strings or Zend_Db_Expr objects.
+     *
+     * The first parameter can be null or an empty string, in which case
+     * no correlation name is generated or prepended to the columns named
+     * in the second parameter.
+     *
+     * @param  array|string|Zend_Db_Expr $name The table name or an associative array
+     *                                         relating correlation name to table name.
+     * @param  array|string|Zend_Db_Expr $cols The columns to select from this table.
+     * @param  string $schema The schema name to specify, if any.
+     * @return Zend_Db_Query
+     */
+    public function insert($name, $cols = null, $schema = null) {
+    	if (self::SQL_SELECT !== $this->mode) {
+    		throw new Zend_Db_Select_Exception('Cannot insert new row when using '. $this->mode);
+    	}
+    	$this->mode = self::SQL_INSERT;
+
+    	return $this->_join(self::FROM, $name, null, $cols, $schema);
+    }
+
+    /**
+     * Set for subquery that should create ON DUPLICATE KEY UPDATE part of query
+     * @var bool $isDuplicate
+     */
+    protected $_isDuplicate = false;
+
+    /**
+     * Switches the query into UPDATE mode and adds a table and optional columns to the query.
+     *
+     * The first parameter $name can be a simple string, in which case the
+     * correlation name is generated automatically.  If you want to specify
+     * the correlation name, the first parameter must be an associative
+     * array in which the key is the correlation name, and the value is
+     * the physical table name.  For example, array('alias' => 'table').
+     * The correlation name is prepended to all columns fetched for this
+     * table.
+     *
+     * The second parameter can be a single string or Zend_Db_Expr object,
+     * or else an array of strings or Zend_Db_Expr objects.
+     *
+     * The first parameter can be null or an empty string, in which case
+     * no correlation name is generated or prepended to the columns named
+     * in the second parameter.
+     *
+     * @param  array|string|Zend_Db_Expr $name The table name or an associative array
+     *                                         relating correlation name to table name.
+     * @param  array|string|Zend_Db_Expr $cols The columns to select from this table.
+     * @param  string $schema The schema name to specify, if any.
+     * @return Zend_Db_Query
+     */
+    public function update($name, $cols = null, $schema = null) {
+    	if (self::SQL_SELECT === $this->mode) {
+    		$this->mode = self::SQL_UPDATE;
+    	}
+    	elseif (self::SQL_INSERT === $this->mode) {
+    		$self = get_class($this);
+    		$update = new $self();
+    		$update->_isDuplicate = true;
+    		$update->from($name);
+    		$this->_parts[self::DUPLICATE] = $update;
+    		return $update;
+    	}
+    	else {
+    		throw new Zend_Db_Select_Exception('Cannot update rows when using '. $this->mode);
+    	}
+
+    	return $this->_join(self::FROM, $name, null, $cols, $schema);
     }
 
     /**
@@ -667,8 +798,8 @@ abstract class Zend_Db_Query
      */
     public function assemble()
     {
-        $sql = self::SQL_SELECT;
-        foreach (array_keys(self::$_partsInit) as $part) {
+        $sql = $this->mode;
+        foreach (array_keys(self::$assembleParts[$this->mode]) as $part) {
             $method = '_render' . ucfirst($part);
             if (method_exists($this, $method)) {
                 $sql = $this->$method($sql);
@@ -690,6 +821,7 @@ abstract class Zend_Db_Query
         } elseif (array_key_exists($part, self::$_partsInit)) {
             $this->_parts[$part] = self::$_partsInit[$part];
         }
+        $this->mode = self::SQL_SELECT;
         return $this;
     }
 
@@ -1057,7 +1189,32 @@ abstract class Zend_Db_Query
             }
         }
 
-        return $sql . "\n\t" . implode(",\n\t", $columns);
+        $keyword = "\n\t"; //SELECT <columns>
+        switch ($this->mode) {
+        	case self::SQL_INSERT:
+        	case self::SQL_UPDATE:
+        		$keyword = ' ' . self::SQL_SET . "\n\t";
+        		break;
+        }
+
+
+        return $sql . $keyword . implode(",\n\t", $columns);
+    }
+
+    /**
+     * Render ON DUPLICATE KEY clause
+     *
+     * @param string   $sql SQL query
+     * @return string
+     */
+    protected function _renderDuplicate($sql) {
+    	$duplicate = $this->_parts[self::DUPLICATE];
+
+    	if ($duplicate) {
+    		$sql .= "\n" . self::SQL_DUPLICATE;
+    		$sql .= ' ' . $duplicate;
+    	}
+    	return $sql;
     }
 
     /**
@@ -1102,7 +1259,16 @@ abstract class Zend_Db_Query
 
         // Add the list of all joins
         if (!empty($from)) {
-            $sql .= "\n " . self::SQL_FROM . ' ' . implode("\n", $from);
+        	$keyword = "\n " . self::SQL_FROM;
+        	switch ($this->mode) {
+        		case self::SQL_INSERT:
+        			$keyword = ' ' . self::SQL_INTO;
+        			break;
+        		case self::SQL_UPDATE:
+        			$keyword = '';
+        			break;
+        	}
+            $sql .= $keyword . ' ' . implode("\n", $from);
         }
 
         return $sql;
@@ -1334,6 +1500,9 @@ abstract class Zend_Db_Query
         try {
         	if ($this->_isCondition) {
         		return implode(' ', $this->_parts[self::WHERE]);
+        	}
+        	if ($this->_isDuplicate) {
+        		return $this->_renderColumns(self::SQL_UPDATE) ?: '';
         	}
             $sql = $this->assemble();
         } catch (Exception $e) {
