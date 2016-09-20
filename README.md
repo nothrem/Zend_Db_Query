@@ -134,6 +134,150 @@ to columns and tables as follows:
 	
 	 LEFT JOIN `authors`  LEFT JOIN `comments` ON 
 
+INSERT and UPDATE support
+-------------------------
+
+This is new and not present in the original ```Zend_Db_Select```.
+
+You can use methods ```insert()``` and ```update()``` to create simple
+insert or update queries. Even insert with duplicate key option and update over
+multiple tables as supported. Special cases of these queries (e.g. IGNORE,
+DELAYED, etc.) are not supported (yet).
+
+To switch to INSERT or UPDATE you simple use the methods ```insert()``` or ```update()```
+instead of the method ```from()```. After using the method ```insert()``` you
+can use the method```update()``` to create ON DUPLICATE KEY query. Other combinations
+of the methods ``insert()```, ```update()``` and ```from()``` are not allowed
+and will result in exception. You must use the method ```reset()``` without parameters
+to clear the current state and allow to use the above methods again.
+
+To define values for the insert or update you simple pass the column names and
+their values into method ```columns()``` or into above methods as the second parameter.
+You can use method ```column()``` to quote the column name and its value. In such
+case the 4th parameter should stay undefined to create value assignment.
+
+Please note that when creating ON DUPLICATE KEY query you must specify a table
+name in the ```update()``` method since the parameter is required. Calling
+the method ```update()``` after the ```insert()``` creates separate query which
+must be handled that way (see below).
+
+Insert example:
+
+    $query
+        ->insert('marriage')
+        ->columns(array(
+                $query->column('spouse_1', null, 'John'),
+                $query->column('spouse_2', null, 'Jane'),
+                $query->column('date', null, new Zend_Db_Expr('NOW()')),
+        ))
+        ->update('marriage') //divorced and getting married again?!?
+        ->columns(array(
+            $query->column('date', null, new Zend_Db_Expr('NOW()')),
+        ))
+    ;
+    $query->assemble();
+    /* Creates:
+     * INSERT INTO `marriage` SET
+     *     `marriage`.`spouse_1` = 'John',
+     *     `marriage`.`spouse_2` = 'Jane',
+     *     `marriage`.`date` = NOW()
+     * ON DUPLICATE KEY UPDATE
+     *     `marriage`.`date` = NOW()
+     */
+
+Update example:
+
+    $query
+        ->update(array('o' => 'online'))
+        ->joinLeft(array('u' => 'user'), array('id', 'online', 'id'))
+        ->columns(array(
+                $query->column('page', 'online', 'account'),
+                $query->column('time', 'online', new Zend_Db_Expr('NOW()')),
+        ))
+        ->where($query->column('name', 'user', 'john01'))
+        ->limit(1)
+        ->order($query->column('id', 'user')) //just to show it's possible
+    ;
+    $query->assemble();
+    /* Creates:
+     * UPDATE `online` AS `o`
+     * LEFT JOIN `user` AS `u`
+     *     ON `u`.`id` = `o`.`id`
+     * SET
+     *     `o`.`page` = 'account',
+     *     `o`.`time` = NOW()
+     * WHERE (`u`.`name` = 'john01')
+     * ORDER BY `u`.`id`
+     * LIMIT 1
+     */
+
+Note that you can use other methods for INSERT and UPDATE but their values will
+not be included in the result, e.g.:
+
+    $query
+        ->insert('marriage')
+        ->columns(array(
+                $query->column('spouse_1', null, 'John'),
+                $query->column('spouse_2', null, 'Jane'),
+                $query->column('date', null, new Zend_Db_Expr('NOW()')),
+        ))
+        ->group('date')
+        ->having('date < NOW()')
+    ;
+    $query->assemble();
+    /* Creates:
+     * INSERT INTO `marriage` 
+     * SET
+     *     `marriage`.`spouse_1` = 'John',
+     *     `marriage`.`spouse_2` = 'Jane',
+     *     `marriage`.`date` = NOW()
+     */
+
+Example for ON DUPLICATE KEY
+
+    $query->insert('marriage');
+    $query->columns(array(
+                $query->column('spouse_1', null, 'John'),
+                $query->column('spouse_2', null, 'Jane'),
+                $query->column('date', null, new Zend_Db_Expr('NOW()')),
+        ))
+    ;
+    $query->update('marriage'); //WRONG
+    $query->columns($query->column('date', null, new Zend_Db_Expr('NOW()')));
+    $query->assemble();
+    /* Creates WRONG query:
+     * INSERT INTO `marriage`
+     * SET
+     *     `marriage`.`spouse_1` = 'John',
+     *     `marriage`.`spouse_2` = 'Jane',
+     *     `marriage`.`date` = NOW(),
+     *     `marriage`.`date` = NOW()
+     * ON DUPLICATE KEY
+     */
+     
+To correctly add columns into the UPDATE part you need to store the returned
+value of the ```update()``` method:
+
+    $query->insert('marriage');
+    $query->columns(array(
+                $query->column('spouse_1', null, 'John'),
+                $query->column('spouse_2', null, 'Jane'),
+                $query->column('date', null, new Zend_Db_Expr('NOW()')),
+        ))
+    ;
+    $update = $query->update('marriage'); //CORRECT
+    $update->columns($query->column('date', null, new Zend_Db_Expr('NOW()')));
+    $query->assemble();
+    /* Creates CORRECT query:
+     * INSERT INTO `marriage`
+     * SET
+     *     `marriage`.`spouse_1` = 'John',
+     *     `marriage`.`spouse_2` = 'Jane',
+     *     `marriage`.`date` = NOW()
+     * ON DUPLICATE KEY UPDATE
+     *     `marriage`.`date` = NOW()
+     */
+
 Standalone usage
 -----------------
 
