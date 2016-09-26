@@ -72,6 +72,11 @@ class Zend_Db_Query_Mysql extends Zend_Db_Query
 			'FLOAT'              => Zend_Db::FLOAT_TYPE
 	);
 
+	/**
+	 * @var bool Define whether to use USING directly or convert it into ON condition
+	 */
+	protected $_realUsing = true;
+
     /**
      * Returns the symbol the adapter uses for delimiting identifiers.
      *

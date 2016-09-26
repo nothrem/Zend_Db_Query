@@ -82,6 +82,7 @@ abstract class Zend_Db_Query
     const SQL_AS         = 'AS';
     const SQL_OR         = 'OR';
     const SQL_ON         = 'ON';
+    const SQL_USING      = 'USING';
     const SQL_ASC        = 'ASC';
     const SQL_DESC       = 'DESC';
 
@@ -939,6 +940,11 @@ abstract class Zend_Db_Query
     }
 
     /**
+     * @var bool Define whether to use USING directly or convert it into ON condition
+     */
+    protected $_realUsing = false;
+
+    /**
      * Handle JOIN... USING... syntax
      *
      * This is functionality identical to the existing JOIN methods, however
@@ -970,16 +976,26 @@ abstract class Zend_Db_Query
             throw new Zend_Db_Select_Exception("You can only perform a joinUsing after specifying a FROM table");
         }
 
-        $join  = $this->quoteIdentifier(key($this->_parts[self::FROM]), true);
-        $from  = $this->quoteIdentifier($this->_uniqueCorrelation($name), true);
-
-        $joinCond = array();
-        foreach ((array)$cond as $fieldName) {
-            $cond1 = $from . '.' . $fieldName;
-            $cond2 = $join . '.' . $fieldName;
-            $joinCond[]  = $cond1 . ' = ' . $cond2;
+        if ($this->_realUsing) {
+        	$q = $this->getQuoteIdentifierSymbol();
+        	if (is_array($cond)) {
+        		$cond = join($q . ', ' . $q, $cond);
+        	}
+			$cond = array($q . $cond . $q);
         }
-        $cond = implode(' '.self::SQL_AND.' ', $joinCond);
+        else {
+        	reset($this->_parts[self::FROM]);
+	        $join  = $this->quoteIdentifier(key($this->_parts[self::FROM]), true);
+	        $from  = $this->quoteIdentifier($this->_uniqueCorrelation($name), true);
+
+	        $joinCond = array();
+	        foreach ((array)$cond as $fieldName) {
+	            $cond1 = $from . '.' . $this->quoteIdentifier($fieldName);
+	            $cond2 = $join . '.' . $this->quoteIdentifier($fieldName);
+	            $joinCond[]  = $cond1 . ' = ' . $cond2;
+	        }
+	        $cond = implode(' '.self::SQL_AND.' ', $joinCond);
+        }
 
         return $this->_join($type, $name, $cond, $cols, $schema);
     }
@@ -1250,7 +1266,7 @@ abstract class Zend_Db_Query
 
             // Add join conditions (if applicable)
             if (!empty($from) && ! empty($table['joinCondition'])) {
-                $tmp .= ' ' . self::SQL_ON . ' ' . $this->_renderJoinCondition($table['joinCondition'], $correlationName);
+                $tmp .= $this->_renderJoinCondition($table['joinCondition'], $correlationName);
             }
 
             // Add the table name and condition add to the list
@@ -1284,19 +1300,20 @@ abstract class Zend_Db_Query
      */
     protected function _renderJoinCondition($condition, $correlationName) {
     	if (!is_array($condition)) {
-    		return $condition;
+    		return ' ' . self::SQL_ON . ' ' . $condition;
     	}
 
 		switch (count($condition)) {
 			case 0:
+				throw new Zend_Db_Select_Exception('Invalid (empty) JOIN condition.');
 			case 1:
-				throw new Zend_Db_Select_Exception('JOIN condition requires two columns.');
+				return ' ' . self::SQL_USING . ' (' . $condition[0] . ')';
 			case 2:
-				return $this->column($condition[0], $correlationName) . ' = ' . $this->column($condition[1]);
+				return ' ' . self::SQL_ON . ' ' . $this->column($condition[0], $correlationName) . ' = ' . $this->column($condition[1]);
 			case 3:
-				return $this->column($condition[0], $correlationName) . ' = ' . $this->column($condition[2], $condition[1]);
+				return ' ' . self::SQL_ON . ' ' . $this->column($condition[0], $correlationName) . ' = ' . $this->column($condition[2], $condition[1]);
 			case 4:
-				return $this->column($condition[1], $condition[0]) . ' = ' . $this->column($condition[3], $condition[2]);
+				return ' ' . self::SQL_ON . ' ' . $this->column($condition[1], $condition[0]) . ' = ' . $this->column($condition[3], $condition[2]);
 		}
     }
 
@@ -1845,11 +1862,9 @@ abstract class Zend_Db_Query
 
     	switch (count($match)) {
     		case 1: //only one column found, return it with table alias stored in its data
-    			if (!empty($match[0][2])) {
+    			if (!empty($match[0][2]) && is_null($tableName)) {
     				return new Zend_Db_Expr($this->quoteIdentifier($match[0][2]) . $value);
     			}
-    			$name = $match[0][1];
-    			$tableName = $match[0][0];
     			//NO BREAK HERE
     		case 0: //no column found, but if table is defined, we can still use it
     			if (is_null($tableName)) {
@@ -1862,6 +1877,9 @@ abstract class Zend_Db_Query
     			}
     			foreach ($this->getPart(self::FROM) as $alias => $table) {
     				if ($tableName === $alias || $tableName === $table['tableName']) {
+    					if (count($match) && !empty($match[0][2])) {
+    						return new Zend_Db_Expr($this->quoteIdentifier($match[0][2]) . $value);
+    					}
     					return new Zend_Db_Expr($this->quoteIdentifier($alias) . '.' . ($this->quoteIdentifier($name)) . $value);
     				}
     			}
@@ -1875,7 +1893,7 @@ abstract class Zend_Db_Query
     				$col = null;
     				if ($tableName === $alias || $tableName === $table['tableName']) {
     					$col = $index[$alias];
-    					return new Zend_Db_Expr($col[2] ? $this->quoteIdentifier($col[2]) : ($this->quoteIdentifier($col[0]) . '.' . $this->quoteIdentifier($col[1])) . $value);
+    					return new Zend_Db_Expr($col[2] ? $this->quoteIdentifier($col[2]) . $value : ($this->quoteIdentifier($col[0]) . '.' . $this->quoteIdentifier($col[1])) . $value);
     				}
     			}
     			return new Zend_Db_Expr($this->quoteIdentifier($tableName) . '.' . ($this->quoteIdentifier($name)) . $value);
