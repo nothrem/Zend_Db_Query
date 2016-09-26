@@ -99,7 +99,27 @@ It can be used to create sub-conditions where needed.
 	 *       (`a`.`available` = 'preview')
 	 *     )
 	 */
-	 
+
+This method can also be used in JOIN conditions.
+
+	$query
+		->from(array('a' => 'articles'))
+		->columns(array('text', 'cat' => 'category'))
+		->joinInner(array('ad' => 'article_data'), $query->condition()
+				->where($query->column('id', 'ad', $query->column('id', 'articles')))
+				->where($query->column('category', 'ad', $query->column('category', 'articles')))
+		)
+	;
+	
+	$sql = $query->assemble();
+	
+	/* returns
+	 *   SELECT `a`.`text`, `a`.`category` AS `cat` 
+	 *   FROM `articles` AS `a` 
+	 *   INNER JOIN `article_data` AS `ad` 
+	 *     ON (`ad`.`id` = `a`.`id`) AND (`ad`.`category` = `cat`)
+	 */
+
 JOIN condition as array
 -----------------------
 
@@ -119,7 +139,6 @@ to columns and tables as follows:
 		//with only 1 value, USING condition will be created
 		->joinInner(array('ad' => 'article_data'), array('id'))
 		// creates "USING (`id`)"
-		//see below chapter "Using USING"
 		
 		//with 2 values, first one is from joined table,
 		//the other one is searched in columns list
@@ -303,7 +322,7 @@ list is converted to ```ON``` condition when rendering the query.
 	;
 
 ```Zend_Db_Query``` will render the column names into real ```USING``` condition
-alowing you to create shorter queries. The real ```USING``` is enabled
+allowing you to create shorter queries. The real ```USING``` is enabled
 by default for ```Zend_Db_Query_Mysql``` and disabled
 for any other ```Zend_Db_Query```. To change whether the real ```USING```
 is created or not see the property ```$_realUsing```.
@@ -322,8 +341,6 @@ is not quoted (which is supported by ANSI SQL 92 standard).
 	$query
 		->from(array('a' => 'articles'))
 		->columns(array('text', 'cat' => 'category'))
-
-		//with only 1 value, USING condition will be created
 		->joinInner(array('ad' => 'article_data'), array('id'))
 		// creates "USING (id)"
 	;
