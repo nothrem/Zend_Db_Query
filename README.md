@@ -115,6 +115,11 @@ to columns and tables as follows:
 	$query
 		->from(array('a' => 'articles'))
 		->columns(array('text', 'cat' => 'category'))
+
+		//with only 1 value, USING condition will be created
+		->joinInner(array('ad' => 'article_data'), array('id'))
+		// creates "USING (`id`)"
+		//see below chapter "Using USING"
 		
 		//with 2 values, first one is from joined table,
 		//the other one is searched in columns list
@@ -280,6 +285,48 @@ value of the ```update()``` method:
      * ON DUPLICATE KEY UPDATE
      *     `marriage`.`date` = NOW()
      */
+
+Using USING
+-----------
+
+In original ```Zend_Db_Select``` you can call any ```join*()``` with appended
+word ```Using``` to define list of column names that must match however this
+list is converted to ```ON``` condition when rendering the query.
+
+	$query
+		->from(array('a' => 'articles'))
+		->columns(array('text', 'cat' => 'category'))
+		->joinInnerUsing(array('ad' => 'article_data'), array('id', 'author', 'category'))
+		// creates "ON `ad`.`id` = `a`.`id`
+		//         AND `ad`.`author` = `a`.`author`
+		//         AND `ad`.`category` = `a`.`category`"
+	;
+
+```Zend_Db_Query``` will render the column names into real ```USING``` condition
+alowing you to create shorter queries. The real ```USING``` is enabled
+by default for ```Zend_Db_Query_Mysql``` and disabled
+for any other ```Zend_Db_Query```. To change whether the real ```USING```
+is created or not see the property ```$_realUsing```.
+
+	$query
+		->from(array('a' => 'articles'))
+		->columns(array('text', 'cat' => 'category'))
+		->joinInnerUsing(array('ad' => 'article_data'), array('id', 'author', 'category'))
+		// creates "USING (`id`, `author`, `category`)"
+	;
+
+Defining only one column in an array for normal ```join*()``` methods will
+always create ```USING``` condition. Note that in this case the column name
+is not quoted (which is supported by ANSI SQL 92 standard).
+
+	$query
+		->from(array('a' => 'articles'))
+		->columns(array('text', 'cat' => 'category'))
+
+		//with only 1 value, USING condition will be created
+		->joinInner(array('ad' => 'article_data'), array('id'))
+		// creates "USING (id)"
+	;
 
 Standalone usage
 -----------------
