@@ -64,6 +64,8 @@ correctly translate the columns and table aliases for the table currently
 being joined, because you call the ```column()``` method before the ```join*()```
 method actually adds the table and its columns).
 
+For more details see the comment in the ```column()``` method's source code.
+
 Method ```condition()```
 ---------------------------
 
@@ -129,7 +131,7 @@ When creating a join, instead of passing the condition as string, you can
 use array and it will automatically convert the column and table names
 to their aliases.
 
-In the array, you can pass 2, 3 or 4 values which then will be translated
+In the array, you can pass 1 to 4 values which then will be translated
 to columns and tables as follows:
 
 	$query
@@ -138,7 +140,7 @@ to columns and tables as follows:
 
 		//with only 1 value, USING condition will be created
 		->joinInner(array('ad' => 'article_data'), array('id'))
-		// creates "USING (`id`)"
+		// creates "USING (id)"
 		
 		//with 2 values, first one is from joined table,
 		//the other one is searched in columns list
@@ -146,7 +148,7 @@ to columns and tables as follows:
 		// creates "ON `c`.`id` = `a`.`cat`"
 		
 		//with 3 values, first one is from joined table,
-		//the other one is processed as table name and column name
+		//the other two are processed as a table name and a column name
 		->joinLeft(array('au' => 'authors'), array('id', 'articles', 'author'))
 		//creates "ON `au`.`id` = `a`.`author`"
 		
@@ -165,20 +167,27 @@ This is new and not present in the original ```Zend_Db_Select```.
 
 You can use methods ```insert()``` and ```update()``` to create simple
 insert or update queries. Even insert with duplicate key option and update over
-multiple tables are supported. Special cases of these queries (e.g. IGNORE,
+multiple tables are supported. Special cases of these queries (e.g.
 DELAYED, etc.) are not supported (yet).
 
 To switch to INSERT or UPDATE you simple use the methods ```insert()``` or ```update()```
 instead of the method ```from()```. After using the method ```insert()``` you
-can use the method```update()``` to create ON DUPLICATE KEY query. Other combinations
-of the methods ```insert()```, ```update()``` and ```from()``` are not allowed
+can use the method ```update()``` to create ON DUPLICATE KEY query. Or if you
+call ```update(false)``` after an ```insert()``` it will switch to ```INSERT IGNORE```.
+
+Other combinations of the methods ```insert()```, ```update()``` and ```from()``` are not allowed
 and will result in an exception. You must use the method ```reset()``` without any
 parameters to clear the current state and allow to use the above methods again.
 
 To define values for the insert or update you simple pass the column names and
 their values into method ```columns()``` or into above methods as the second parameter.
+
 You can use method ```column()``` to quote the column name and its value. In such
-case the 4th parameter should stay undefined to create value assignment.
+case you can use the 4th parameter of ```column()``` to pass a default value
+which will be used in case the 3rd parameter is ```NULL```. If both 3rd and 4th
+parameters evaluate to ```NULL``` the query will set the column's value to ```NULL```.
+Please note that this may create invalid query if the column is defined
+as ```NOT NULL``` in the table structure.
 
 Please note that when creating ON DUPLICATE KEY query you must specify a table
 name in the ```update()``` method since the parameter is required. Calling
@@ -190,9 +199,10 @@ INSERT example:
     $query
         ->insert('marriage')
         ->columns(array(
-                $query->column('spouse_1', null, 'John'),
-                $query->column('spouse_2', null, 'Jane'),
+                $query->column('spouse_1', null, $spouse1, 'John'),
+                $query->column('spouse_2', null, $spouse2, 'Jane'),
                 $query->column('date', null, new Zend_Db_Expr('NOW()')),
+                $query->column('divorce'), //will set to NULL
         ))
         ->update('marriage') //divorced and getting married again?!?
         ->columns(array(
@@ -204,11 +214,26 @@ INSERT example:
      * INSERT INTO `marriage` SET
      *     `marriage`.`spouse_1` = 'John',
      *     `marriage`.`spouse_2` = 'Jane',
-     *     `marriage`.`date` = NOW()
+     *     `marriage`.`date` = NOW(),
+     *     `marriage`.`divorce` = NULL
      * ON DUPLICATE KEY UPDATE
      *     `marriage`.`date` = NOW()
      */
 
+    $query
+        ->insert('church_event')
+        ->columns(array(
+                $query->column('type', null, 'wedding'),
+                $query->column('date', null, new Zend_Db_Expr('NOW()')),
+        ))
+        ->update(false)
+    ;
+    $query->assemble();
+    /* Creates:
+     * INSERT IGNORE INTO `church_event` SET
+     *     `marriage`.`type` = 'wedding',
+     *     `marriage`.`date` = NOW()
+     */
 UPDATE example:
 
     $query
@@ -234,7 +259,7 @@ UPDATE example:
      * ORDER BY `u`.`id`
      * LIMIT 1
      */
-     
+
 You must define the table names for joins and columns in case you update more table
 since the method ```column()``` cannot detect column names from their definitions
 and the column names would become ambiguous.
@@ -281,7 +306,7 @@ Example for ON DUPLICATE KEY:
      *     `marriage`.`date` = NOW()
      * ON DUPLICATE KEY
      */
-     
+
 To correctly add columns into the UPDATE part you need to store the returned
 value of the ```update()``` method:
 
