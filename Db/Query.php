@@ -65,6 +65,7 @@ abstract class Zend_Db_Query
     const SQL_WILDCARD   = '*';
     const SQL_SELECT     = 'SELECT';
     const SQL_INSERT     = 'INSERT';
+    const SQL_INS_IGNORE = 'INSERT IGNORE';
     const SQL_UPDATE     = 'UPDATE';
     const SQL_DUPLICATE  = 'ON DUPLICATE KEY';
     const SQL_UNION      = 'UNION';
@@ -85,6 +86,7 @@ abstract class Zend_Db_Query
     const SQL_USING      = 'USING';
     const SQL_ASC        = 'ASC';
     const SQL_DESC       = 'DESC';
+    const SQL_NULL       = 'NULL';
 
     /**
      * Define mode of the query (e.g. SELECT, INSERT, etc.)
@@ -145,6 +147,10 @@ abstract class Zend_Db_Query
     				self::COLUMNS => array(),
     				self::DUPLICATE => array(),
     		),
+    		self::SQL_INS_IGNORE => array(
+    				self::FROM => array(),
+    				self::COLUMNS => array(),
+    		),
     		self::SQL_UPDATE => array(
     				self::FROM => array(),
     				self::COLUMNS => array(),
@@ -152,6 +158,17 @@ abstract class Zend_Db_Query
     				self::ORDER        => array(),
     				self::LIMIT_OFFSET => null, //actually renders both count and offset
     		),
+    );
+
+    /**
+     * Query modes that require value to be defined in column() method.
+     * If value is not defined, NULL or value given into $operator is used.
+     * @var array $columnRequireValue
+     */
+    protected static $columnRequireValue = array(
+    		self::SQL_INSERT,
+    		self::SQL_INS_IGNORE,
+    		self::SQL_UPDATE,
     );
 
     /**
@@ -305,7 +322,7 @@ abstract class Zend_Db_Query
 
     /**
      * Set for subquery that should create ON DUPLICATE KEY UPDATE part of query
-     * @var bool $isDuplicate
+     * @var bool $_isDuplicate
      */
     protected $_isDuplicate = false;
 
@@ -327,8 +344,9 @@ abstract class Zend_Db_Query
      * no correlation name is generated or prepended to the columns named
      * in the second parameter.
      *
-     * @param  array|string|Zend_Db_Expr $name The table name or an associative array
+     * @param  array|string|Zend_Db_Expr|bool $name The table name or an associative array
      *                                         relating correlation name to table name.
+     *                                         By setting FALSE after using insert() you can create `INSERT IGNORE` query
      * @param  array|string|Zend_Db_Expr $cols The columns to select from this table.
      * @param  string $schema The schema name to specify, if any.
      * @return Zend_Db_Query
@@ -338,6 +356,11 @@ abstract class Zend_Db_Query
     		$this->mode = self::SQL_UPDATE;
     	}
     	elseif (self::SQL_INSERT === $this->mode) {
+    		if (false === $name) {
+    			$this->mode = self::SQL_INS_IGNORE;
+    			return $this;
+    		}
+
     		$self = get_class($this);
     		$update = new $self();
     		$update->_isDuplicate = true;
@@ -1208,6 +1231,7 @@ abstract class Zend_Db_Query
         $keyword = "\n\t"; //SELECT <columns>
         switch ($this->mode) {
         	case self::SQL_INSERT:
+        	case self::SQL_INS_IGNORE:
         	case self::SQL_UPDATE:
         		$keyword = ' ' . self::SQL_SET . "\n\t";
         		break;
@@ -1278,6 +1302,7 @@ abstract class Zend_Db_Query
         	$keyword = "\n " . self::SQL_FROM;
         	switch ($this->mode) {
         		case self::SQL_INSERT:
+        		case self::SQL_INS_IGNORE:
         			$keyword = ' ' . self::SQL_INTO;
         			break;
         		case self::SQL_UPDATE:
@@ -1796,7 +1821,7 @@ abstract class Zend_Db_Query
      * @param  string $name Full name or alias of a column.
      * @param  string $tableName (optional, default: null) Full name or alias of a table the column belong to. Must be defined if $name is not defined in column list or the $name is ambiguous.
      * @param  mixed $value (optional, default: null) If defined, will return full condition with the $operator and quoted $value.
-     * @param  string $operator (optional, default: '=') Operator for the condition.
+     * @param  string $operator (optional, default: '=') Operator for the condition. For INSERT and UPDATE this serves as the default value, where default is NULL.
      * @throws Zend_Db_Select_Exception
      * @return string Table and column alias (or full name if not defined) or whole condition incl. the given $value.
      *
@@ -1812,10 +1837,24 @@ abstract class Zend_Db_Query
      *     $query->column('gender', 'users', 'male', '!='); //returns "`u`.`gender` != 'male'"
      *     $query->column('name', null, '%Doe', 'like');    //returns "`u`.`name` LIKE '%Doe'"
      *     $query->column('name', null, 'Doe', 'like');     //returns "`u`.`name` LIKE '%Doe%'" (wraps value in % if $operator is LIKE and there are no % in the $value)
-     *     $query->column('id', null, array(1,2,'-'), 'in');//returns "`u`.`name` IN (1, 2, '-')" (automatically convert and quote array for IN operator)
-     *     $query->column('id', null, $subquery, 'in');     //returns "`u`.`name` IN (SELECT ...)" (accepts another Zend_Db_Query as the value for IN operator)
+     *     $query->column('id', null, array(1,2,'-'), 'in');//returns "`u`.`id` IN (1, 2, '-')" (automatically convert and quote array for IN operator)
+     *     $query->column('id', null, $subquery, 'in');     //returns "`u`.`id` IN (SELECT ...)" (accepts another Zend_Db_Query as the value for IN operator)
+     *     $query->column('date', null, array($from, $to), 'between');
+     *                                                      //returns "`u`.`date` BETWEEN 'date1' AND 'date2'"
+     *
+     *     //operators NOT LIKE, NOT IN and NOT BETWEEN works as same as LIKE, IN and BETWEEN respectively.
      *
      *     $query->where($query->column('id', null, 123));  //adds condition with correctly aliased, prefixed and quoted name and value: " (`u`.`i` = 123) "
+     *
+     *     //for INSERT or UPDATE the value is always included
+     *     $query->update('users');
+     *
+     *     $query->column('id');                            //returns "`users`.`id` = NULL"
+     *     $query->column('id', 'users', 1);                //returns "`users`.`id` = 1"
+     *     $query->column('id', 'users', 'none');           //returns "`users`.`id` = 'none'"
+     *     $query->column('id', null, null, 0);             //returns "`users`.`id` = 0"
+     *     $query->column('id', null, null, '');            //returns "`users`.`id` = ''"
+
      * </code>
      */
     public function column($name, $tableName = null, $value = null, $operator = '=') {
@@ -1833,31 +1872,55 @@ abstract class Zend_Db_Query
     		}
     	}
 
-    	$operator = strtoupper($operator);
-    	if (isset($value)) {
-    		if ('LIKE' === $operator && false === strpos($value, '%')) {
-    			$value = ' LIKE ' . $this->quote('%' . $value . '%');
+    	if (in_array($this->mode, self::$columnRequireValue)) {
+    		if ('=' === $operator) {
+    			$operator = null;
     		}
-    		elseif ('IN' === $operator) {
-    			if (is_array($value)) {
-    				foreach ($value as $i => $val) {
-    					$value[$i] = $this->quote($val);
-    				}
-    				$value = ' IN (' . implode(', ', $value) . ')';
-    			}
-    			else {
-    				$value = ' IN (' . $value . ')';
-    			}
+    		if (is_null($value)) {
+    			$value = ' = ' . (is_null($operator) ? self::SQL_NULL : $this->quote($operator));
     		}
     		else {
-    			$value = ' ' . $operator . ' ' . $this->quote($value);
+    			$value = ' = ' . $this->quote($value);
     		}
     	}
-    	elseif (in_array($operator, array(self::SQL_ASC, self::SQL_DESC, 'IS NULL', 'IS NOT NULL'))) {
-    		$value = ' ' . $operator;
-    	}
-    	else {
-    		$value = '';
+    	else { //select mode - value is optional (used for conditions)
+	    	$operator = strtoupper($operator);
+	    	if (isset($value)) {
+	    		if (in_array($operator, array('LIKE', 'NOT LIKE')) && false === strpos($value, '%')) {
+	    			$value = ' ' . $operator . ' ' . $this->quote('%' . $value . '%');
+	    		}
+	    		elseif (in_array($operator, array('IN', 'NOT IN'))) {
+	    			if (is_array($value)) {
+	    				foreach ($value as $i => $val) {
+	    					$value[$i] = $this->quote($val);
+	    				}
+	    				$value = ' IN (' . implode(', ', $value) . ')';
+	    			}
+	    			else {
+	    				$value = ' IN (' . $value . ')';
+	    			}
+	    		}
+	    		elseif (in_array($operator, array('BETWEEN', 'NOT BETWEEN'))) {
+	    			if ($value instanceof Zend_Db_Expr) {
+	    				$value = ' ' . $operator . $value;
+	    			}
+	    			elseif (is_array($value) && 2 === count($value)) {
+	    				$value = ' ' . $operator . ' ' . $this->quote($value[0]) . ' ' . self::SQL_AND . ' ' . $this->quote($value[1]);
+	    			}
+	    			else {
+	    				throw new Zend_Db_Select_Exception('Operator BETWEEN requires two values in an array.');
+	    			}
+	    		}
+	    		else {
+	    			$value = ' ' . $operator . ' ' . $this->quote($value);
+	    		}
+	    	}
+	    	elseif (in_array($operator, array(self::SQL_ASC, self::SQL_DESC, 'IS NULL', 'IS NOT NULL'))) {
+	    		$value = ' ' . $operator;
+	    	}
+	    	else {
+	    		$value = '';
+	    	}
     	}
 
     	switch (count($match)) {
