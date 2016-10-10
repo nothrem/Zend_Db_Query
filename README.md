@@ -64,6 +64,8 @@ correctly translate the columns and table aliases for the table currently
 being joined, because you call the ```column()``` method before the ```join*()```
 method actually adds the table and its columns).
 
+For more details see the comment in the ```column()``` method's source code.
+
 Method ```condition()```
 ---------------------------
 
@@ -129,7 +131,7 @@ When creating a join, instead of passing the condition as string, you can
 use array and it will automatically convert the column and table names
 to their aliases.
 
-In the array, you can pass 2, 3 or 4 values which then will be translated
+In the array, you can pass 1 to 4 values which then will be translated
 to columns and tables as follows:
 
 	$query
@@ -138,7 +140,7 @@ to columns and tables as follows:
 
 		//with only 1 value, USING condition will be created
 		->joinInner(array('ad' => 'article_data'), array('id'))
-		// creates "USING (`id`)"
+		// creates "USING (id)"
 		
 		//with 2 values, first one is from joined table,
 		//the other one is searched in columns list
@@ -146,7 +148,7 @@ to columns and tables as follows:
 		// creates "ON `c`.`id` = `a`.`cat`"
 		
 		//with 3 values, first one is from joined table,
-		//the other one is processed as table name and column name
+		//the other two are processed as a table name and a column name
 		->joinLeft(array('au' => 'authors'), array('id', 'articles', 'author'))
 		//creates "ON `au`.`id` = `a`.`author`"
 		
@@ -304,7 +306,7 @@ Example for ON DUPLICATE KEY:
      *     `marriage`.`date` = NOW()
      * ON DUPLICATE KEY
      */
-     
+
 To correctly add columns into the UPDATE part you need to store the returned
 value of the ```update()``` method:
 
