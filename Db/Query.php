@@ -1357,7 +1357,7 @@ abstract class Zend_Db_Query
                 if ($target instanceof Zend_Db_Select || $target instanceof Zend_Db_Query) {
                     $target = $target->assemble();
                 }
-                $sql .= $target;
+                $sql .= '(' . $target . ')';
                 if ($cnt < $parts - 1) {
                     $sql .= ' ' . $type . ' ';
                 }
