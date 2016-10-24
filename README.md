@@ -160,7 +160,7 @@ to columns and tables as follows:
 	
 	 LEFT JOIN `authors`  LEFT JOIN `comments` ON 
 
-INSERT and UPDATE support
+INSERT, UPDATE and DELETE support
 -------------------------
 
 This is new and not present in the original ```Zend_Db_Select```.
@@ -175,7 +175,16 @@ instead of the method ```from()```. After using the method ```insert()``` you
 can use the method ```update()``` to create ON DUPLICATE KEY query. Or if you
 call ```update(false)``` after an ```insert()``` it will switch to ```INSERT IGNORE```.
 
-Other combinations of the methods ```insert()```, ```update()``` and ```from()``` are not allowed
+The same way you can create DELETE query by using method ```delete()```.
+When using the ```delete()``` method you don't need to call the ```columns()``` method
+but you MUST include at least one ```where()``` condition. Uncoditioned DELETE command
+is not supported and will throw an exception. This is to prevent the developer to
+accidentally delete all the table data (see the example below).
+In case you need to really delete all the data, use ```TRUNCATE TABLE name``` 
+which is better optimized for such action (however you will need the DROP privilage for the database).
+
+Other combinations of the methods ```insert()```, ```update()```, ```delete()```
+and ```from()``` are not allowed
 and will result in an exception. You must use the method ```reset()``` without any
 parameters to clear the current state and allow to use the above methods again.
 
@@ -259,6 +268,27 @@ UPDATE example:
      * ORDER BY `u`.`id`
      * LIMIT 1
      */
+
+DELETE example:
+
+    $query
+        ->delete('online')
+        ->limit(1)
+    ;
+    if (isset($user_id)) {
+        $query->where($query->column('id', null, $user_id));
+    }
+    $query->assemble();
+    /* Throw an exception if $user_id is undefined or creates:
+     * DELETE FROM `online` 
+     * WHERE (`online`.`id` = 12345)
+     * LIMIT 1
+     * 
+     * Note that if $user_id was undefined and there was no exception
+     * the uncoditioned query DELETE FROM `online` LIMIT 1 would 
+     * delete randomly one row from the table which is not the expected result.
+     */
+
 
 You must define the table names for joins and columns in case you update more table
 since the method ```column()``` cannot detect column names from their definitions

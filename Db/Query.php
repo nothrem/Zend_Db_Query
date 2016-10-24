@@ -68,6 +68,7 @@ abstract class Zend_Db_Query
     const SQL_INS_IGNORE = 'INSERT IGNORE';
     const SQL_UPDATE     = 'UPDATE';
     const SQL_DUPLICATE  = 'ON DUPLICATE KEY';
+    const SQL_DELETE     = 'DELETE';
     const SQL_UNION      = 'UNION';
     const SQL_UNION_ALL  = 'UNION ALL';
     const SQL_FROM       = 'FROM';
@@ -87,6 +88,7 @@ abstract class Zend_Db_Query
     const SQL_ASC        = 'ASC';
     const SQL_DESC       = 'DESC';
     const SQL_NULL       = 'NULL';
+    const SQL_ROW_COUNT  = 'SELECT ROW_COUNT();';
 
     /**
      * Define mode of the query (e.g. SELECT, INSERT, etc.)
@@ -154,6 +156,12 @@ abstract class Zend_Db_Query
     		self::SQL_UPDATE => array(
     				self::FROM => array(),
     				self::COLUMNS => array(),
+    				self::WHERE        => array(),
+    				self::ORDER        => array(),
+    				self::LIMIT_OFFSET => null, //actually renders both count and offset
+    		),
+    		self::SQL_DELETE => array(
+    				self::FROM         => array(),
     				self::WHERE        => array(),
     				self::ORDER        => array(),
     				self::LIMIT_OFFSET => null, //actually renders both count and offset
@@ -318,6 +326,38 @@ abstract class Zend_Db_Query
     	$this->mode = self::SQL_INSERT;
 
     	return $this->_join(self::FROM, $name, null, $cols, $schema);
+    }
+
+    /**
+     * Switches the query into DELETE mode and adds an FROM table to the query.
+     *
+     * The first parameter $name can be a simple string, in which case the
+     * correlation name is generated automatically.  If you want to specify
+     * the correlation name, the first parameter must be an associative
+     * array in which the key is the correlation name, and the value is
+     * the physical table name.  For example, array('alias' => 'table').
+     * The correlation name is prepended to all columns fetched for this
+     * table.
+     *
+     * The second parameter is ignored as the DELETE query does not use columns.
+     *
+     * The first parameter can be null or an empty string, in which case
+     * no correlation name is generated or prepended to the columns named
+     * in the second parameter.
+     *
+     * @param  array|string|Zend_Db_Expr $name The table name or an associative array
+     *                                         relating correlation name to table name.
+     * @param  null $cols Ignored (present for compatibility with other methods).
+     * @param  string $schema The schema name to specify, if any.
+     * @return Zend_Db_Query
+     */
+    public function delete($name, $cols = null, $schema = null) {
+    	if (self::SQL_SELECT !== $this->mode) {
+    		throw new Zend_Db_Select_Exception('Cannot delete rows when using '. $this->mode);
+    	}
+    	$this->mode = self::SQL_DELETE;
+
+    	return $this->_join(self::FROM, $name, null, null, $schema);
     }
 
     /**
@@ -1308,6 +1348,11 @@ abstract class Zend_Db_Query
         		case self::SQL_UPDATE:
         			$keyword = '';
         			break;
+        		case self::SQL_DELETE:
+        			if (empty($this->getPart(self::WHERE))) {
+        				throw new Zend_Db_Select_Exception('Unconditioned delete is not allowed!');
+        			}
+        			break; //uses FROM keyword
         	}
             $sql .= $keyword . ' ' . implode("\n", $from);
         }
